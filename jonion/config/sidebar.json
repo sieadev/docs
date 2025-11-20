@@ -1,0 +1,39 @@
+{
+  "/jonion/": [
+    {
+      "text": "Introduction",
+      "items": [
+        { "text": "Installation", "link": "/jonion/introduction/installation" }
+      ]
+    },
+    {
+      "text": "Creating a Plugin System",
+      "items": [
+        { "text": "Setting Up Your Plugin Manager", "link": "/jonion/creating-a-plugin-system/setting-up-a-plugin-manager" }
+      ]
+    },
+    {
+      "text": "Creating a Plugin",
+      "items": [
+        { "text": "Plugin Introduction", "link": "/jonion/creating-a-plugin/plugin-introduction" },
+        { "text": "Plugin Dependencies", "link": "/jonion/creating-a-plugin/plugin-dependencies" },
+        { "text": "Plugin Configurations", "link": "/jonion/creating-a-plugin/plugin-configurations" },
+        { "text": "Plugin Metadata", "link": "/jonion/creating-a-plugin/plugin-meta-data" }
+      ]
+    },
+    {
+      "text": "Advanced",
+      "items": [
+        { "text": "Plugin States", "link": "/jonion/advanced/plugin-states" },
+        { "text": "Descriptors and Descriptor Finders", "link": "/jonion/advanced/descriptors-and-descriptor-finders" }
+      ]
+    },
+    {
+      "text": "Other",
+      "items": [
+        { "text": "Error Handling", "link": "/jonion/other/error-handling" },
+        { "text": "Logging", "link": "/jonion/other/logging" }
+      ]
+    }
+  ]
+}
