@@ -72,7 +72,7 @@ In your API module's `pom.xml`, add Jonion as a dependency:
 </dependency>
 ```
 
-Replace `${jonionversion}` with the latest available version.
+Replace `${jonionversion}` with the latest available version. [![Maven Central](https://img.shields.io/maven-central/v/dev.siea.jonion/Jonion?label=Maven%20Central)](https://central.sonatype.com/artifact/dev.siea.jonion/Jonion)  
 
 ## Next Steps
 
