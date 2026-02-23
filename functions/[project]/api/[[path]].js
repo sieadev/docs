@@ -11,15 +11,22 @@ export async function onRequest({ request, params }) {
   }
 
   const url = new URL(request.url);
+  const path = url.pathname;
 
-  // Redirect /<project>/api -> /<project>/api/latest/
-  if (url.pathname === `/${project}/api` || url.pathname === `/${project}/api/`) {
+  if (path === `/${project}/api` || path === `/${project}/api/`) {
     return Response.redirect(`${url.origin}/${project}/api/latest/`, 302);
+  }
+
+  if (
+    !path.endsWith("/") &&
+    path.startsWith(`/${project}/api/`) &&
+    !path.split("/").pop().includes(".")
+  ) {
+    return Response.redirect(`${url.origin}${path}/`, 302);
   }
 
   const rest = Array.isArray(params.path) ? params.path.join("/") : (params.path || "");
   const upstreamUrl = `${upstream}/${rest}${url.search}`;
 
-  const proxyRequest = new Request(upstreamUrl, request);
-  return fetch(proxyRequest);
+  return fetch(new Request(upstreamUrl, request));
 }
