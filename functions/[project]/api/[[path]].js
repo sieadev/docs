@@ -19,36 +19,6 @@ export async function onRequest({ request, params }) {
     return Response.redirect(`${url.origin}${apiPrefix}/latest/`, 302);
   }
 
-  // Serve an iframe wrapper for page-like paths under /project/api/... (no extension in last segment).
-  // The upstream site loads in the iframe so CSS, JS, and links all work. Asset URLs are proxied below.
-  if (path.startsWith(apiPrefixSlash)) {
-    const lastSegment = path.split("/").filter(Boolean).pop() || "";
-    if (!lastSegment.includes(".")) {
-      const rest = path.slice(apiPrefixSlash.length) || "latest/";
-      const iframeSrc = `${upstream}/${rest.replace(/^\/+/, "")}`;
-      const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>API Docs</title>
-  <style>html,body{margin:0;height:100%;}iframe{border:0;width:100%;height:100%;display:block}</style>
-</head>
-<body>
-  <iframe src="${iframeSrc.replace(/"/g, "&quot;")}" title="API Documentation"></iframe>
-</body>
-</html>`;
-      return new Response(html, {
-        status: 200,
-        headers: {
-          "content-type": "text/html; charset=utf-8",
-          "content-length": String(new TextEncoder().encode(html).length),
-        },
-      });
-    }
-  }
-
-  // Trailing-slash redirect for page-like paths
   if (
     !path.endsWith("/") &&
     path.startsWith(apiPrefixSlash) &&
@@ -84,6 +54,30 @@ export async function onRequest({ request, params }) {
             ? `${upstream}${location}`
             : `${upstream}/${location}`;
         const followResponse = await fetch(upstreamTarget, { redirect: "follow" });
+        const followContentType = followResponse.headers.get("content-type") || "";
+        if (followResponse.status === 200 && followContentType.includes("text/html")) {
+          const pathAfterApi = path.slice(apiPrefixSlash.length);
+          const version = pathAfterApi.split("/")[0];
+          const versionRoot = `${apiPrefixSlash}${version}/`;
+          let html = await followResponse.text();
+          html = html.replace(/(href|src)=["']((?:\.\.\/)+)([^"']+)["']/gi, (_, attr, _dots, rest) => `${attr}="${versionRoot}${rest.replace(/^\//, "")}"`);
+          html = html.replace(/(href|src)=["']dev\/(stylesheet\.css|script\.js|jquery-ui\.overrides\.css|script-dir\/[^"']+)["']/gi, (_, attr, asset) => `${attr}="${versionRoot}${asset}"`);
+          const pathDir = path.endsWith("/") ? path : path.replace(/\/[^/]*$/, "/");
+          const documentBase = `${url.origin}${pathDir}`;
+          html = html.replace(/(href|src)=["'](?!https?:|\/\/|#|mailto:)([^"']*)["']/gi, (match, attr, rel) => {
+            const trimmed = rel.trim();
+            if (!trimmed) return match;
+            try {
+              const resolved = new URL(trimmed, documentBase);
+              if (resolved.origin !== url.origin || !resolved.pathname.startsWith(apiPrefix)) return match;
+              return `${attr}="${resolved.pathname}${resolved.search}${resolved.hash}"`;
+            } catch { return match; }
+          });
+          const newHeaders = new Headers(followResponse.headers);
+          newHeaders.delete("content-encoding");
+          newHeaders.set("content-length", String(new TextEncoder().encode(html).length));
+          return new Response(html, { status: 200, headers: newHeaders });
+        }
         const newHeaders = new Headers(followResponse.headers);
         newHeaders.delete("content-encoding");
         return new Response(followResponse.body, {
@@ -96,6 +90,46 @@ export async function onRequest({ request, params }) {
       headers.set("Location", newLocation);
       return new Response(response.body, { status: response.status, headers });
     }
+  }
+
+  const contentType = response.headers.get("content-type") || "";
+  if (response.status === 200 && contentType.includes("text/html")) {
+    const pathAfterApi = path.slice(apiPrefixSlash.length);
+    const version = pathAfterApi.split("/")[0];
+    const versionRoot = `${apiPrefixSlash}${version}/`;
+
+    let html = await response.text();
+
+    html = html.replace(
+      /(href|src)=["']((?:\.\.\/)+)([^"']+)["']/gi,
+      (_, attr, _dots, rest) => `${attr}="${versionRoot}${rest.replace(/^\//, "")}"`
+    );
+
+    html = html.replace(
+      /(href|src)=["']dev\/(stylesheet\.css|script\.js|jquery-ui\.overrides\.css|script-dir\/[^"']+)["']/gi,
+      (_, attr, asset) => `${attr}="${versionRoot}${asset}"`
+    );
+
+    const pathDir = path.endsWith("/") ? path : path.replace(/\/[^/]*$/, "/");
+    const documentBase = `${url.origin}${pathDir}`;
+    html = html.replace(
+      /(href|src)=["'](?!https?:|\/\/|#|mailto:)([^"']*)["']/gi,
+      (match, attr, rel) => {
+        const trimmed = rel.trim();
+        if (!trimmed) return match;
+        try {
+          const resolved = new URL(trimmed, documentBase);
+          if (resolved.origin !== url.origin || !resolved.pathname.startsWith(apiPrefix)) return match;
+          return `${attr}="${resolved.pathname}${resolved.search}${resolved.hash}"`;
+        } catch {
+          return match;
+        }
+      }
+    );
+
+    const newHeaders = new Headers(response.headers);
+    newHeaders.set("content-length", String(new TextEncoder().encode(html).length));
+    return new Response(html, { status: 200, headers: newHeaders });
   }
 
   return response;
