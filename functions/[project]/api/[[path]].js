@@ -3,6 +3,13 @@ export async function onRequest({ request, params }) {
     jonion: "https://jonion-javadoc.pages.dev",
   };
 
+  // Base path = directory of the current document. Resolve every relative link from that, no special cases.
+  function getDocumentBasePath(path) {
+    if (path.endsWith("/")) return path;
+    const idx = path.lastIndexOf("/");
+    return idx <= 0 ? "/" : path.slice(0, idx + 1);
+  }
+
   const project = params.project;
   const upstream = UPSTREAMS[project];
 
@@ -19,14 +26,7 @@ export async function onRequest({ request, params }) {
     return Response.redirect(`${url.origin}${apiPrefix}/latest/`, 302);
   }
 
-  if (
-    !path.endsWith("/") &&
-    path.startsWith(apiPrefixSlash) &&
-    !path.split("/").pop().includes(".")
-  ) {
-    return Response.redirect(`${url.origin}${path}/`, 302);
-  }
-
+  // No trailing-slash redirect: keep path as-is so document base = directory of path works globally
   const rest = Array.isArray(params.path) ? params.path.join("/") : (params.path || "");
   const lastSegment = rest.split("/").filter(Boolean).pop() || "";
   const needsTrailingSlash = !lastSegment.includes(".");
@@ -62,7 +62,7 @@ export async function onRequest({ request, params }) {
           let html = await followResponse.text();
           html = html.replace(/(href|src)=["']((?:\.\.\/)+)([^"']+)["']/gi, (_, attr, _dots, rest) => `${attr}="${versionRoot}${rest.replace(/^\//, "")}"`);
           html = html.replace(/(href|src)=["']dev\/(stylesheet\.css|script\.js|jquery-ui\.overrides\.css|script-dir\/[^"']+)["']/gi, (_, attr, asset) => `${attr}="${versionRoot}${asset}"`);
-          const pathDir = path.endsWith("/") ? path : path.replace(/\/[^/]*$/, "/");
+          const pathDir = getDocumentBasePath(path);
           const documentBase = `${url.origin}${pathDir}`;
           html = html.replace(/(href|src)=["'](?!https?:|\/\/|#|mailto:)([^"']*)["']/gi, (match, attr, rel) => {
             const trimmed = rel.trim();
@@ -110,7 +110,7 @@ export async function onRequest({ request, params }) {
       (_, attr, asset) => `${attr}="${versionRoot}${asset}"`
     );
 
-    const pathDir = path.endsWith("/") ? path : path.replace(/\/[^/]*$/, "/");
+    const pathDir = getDocumentBasePath(path);
     const documentBase = `${url.origin}${pathDir}`;
     html = html.replace(
       /(href|src)=["'](?!https?:|\/\/|#|mailto:)([^"']*)["']/gi,
