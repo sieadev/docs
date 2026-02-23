@@ -28,5 +28,23 @@ export async function onRequest({ request, params }) {
   const rest = Array.isArray(params.path) ? params.path.join("/") : (params.path || "");
   const upstreamUrl = `${upstream}/${rest}${url.search}`;
 
-  return fetch(new Request(upstreamUrl, request));
+  const response = await fetch(new Request(upstreamUrl, request));
+
+  // Rewrite redirect Location so browser stays on /project/api/... instead of going to /latest/ etc.
+  if (response.status >= 300 && response.status < 400) {
+    const location = response.headers.get("Location");
+    if (location) {
+      const base = `${url.origin}/${project}/api`;
+      const newLocation = location.startsWith("/")
+        ? `${base}${location}`  // upstream path like /latest/ or /1.2.3/
+        : location.startsWith("http")
+          ? location.replace(new URL(upstream).origin, `${url.origin}/${project}/api`)  // absolute to upstream
+          : `${base}/${location}`;  // relative without leading slash
+      const headers = new Headers(response.headers);
+      headers.set("Location", newLocation);
+      return new Response(response.body, { status: response.status, headers });
+    }
+  }
+
+  return response;
 }
