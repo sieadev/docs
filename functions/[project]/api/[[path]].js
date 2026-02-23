@@ -66,5 +66,19 @@ export async function onRequest({ request, params }) {
     }
   }
 
+  const contentType = response.headers.get("content-type") || "";
+  if (response.status === 200 && contentType.includes("text/html")) {
+    const pathAfterApi = path.slice(`/${project}/api/`.length);
+    const version = pathAfterApi.split("/")[0];
+    const versionRoot = version ? `/${project}/api/${version}/` : `/${project}/api/`;
+    const baseUrl = `${url.origin}${versionRoot}`;
+    const baseTag = `<base href="${baseUrl}">`;
+    const html = await response.text();
+    const rewritten = html.replace(/<head(\s[^>]*)?>/i, (m) => m + baseTag);
+    const newHeaders = new Headers(response.headers);
+    newHeaders.set("content-length", String(new TextEncoder().encode(rewritten).length));
+    return new Response(rewritten, { status: 200, headers: newHeaders });
+  }
+
   return response;
 }
