@@ -12,14 +12,46 @@ export async function onRequest({ request, params }) {
 
   const url = new URL(request.url);
   const path = url.pathname;
+  const apiPrefix = `/${project}/api`;
+  const apiPrefixSlash = `${apiPrefix}/`;
 
-  if (path === `/${project}/api` || path === `/${project}/api/`) {
-    return Response.redirect(`${url.origin}/${project}/api/latest/`, 302);
+  if (path === apiPrefix || path === `${apiPrefix}/`) {
+    return Response.redirect(`${url.origin}${apiPrefix}/latest/`, 302);
   }
 
+  // Serve an iframe wrapper for page-like paths under /project/api/... (no extension in last segment).
+  // The upstream site loads in the iframe so CSS, JS, and links all work. Asset URLs are proxied below.
+  if (path.startsWith(apiPrefixSlash)) {
+    const lastSegment = path.split("/").filter(Boolean).pop() || "";
+    if (!lastSegment.includes(".")) {
+      const rest = path.slice(apiPrefixSlash.length) || "latest/";
+      const iframeSrc = `${upstream}/${rest.replace(/^\/+/, "")}`;
+      const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>API Docs</title>
+  <style>html,body{margin:0;height:100%;}iframe{border:0;width:100%;height:100%;display:block}</style>
+</head>
+<body>
+  <iframe src="${iframeSrc.replace(/"/g, "&quot;")}" title="API Documentation"></iframe>
+</body>
+</html>`;
+      return new Response(html, {
+        status: 200,
+        headers: {
+          "content-type": "text/html; charset=utf-8",
+          "content-length": String(new TextEncoder().encode(html).length),
+        },
+      });
+    }
+  }
+
+  // Trailing-slash redirect for page-like paths
   if (
     !path.endsWith("/") &&
-    path.startsWith(`/${project}/api/`) &&
+    path.startsWith(apiPrefixSlash) &&
     !path.split("/").pop().includes(".")
   ) {
     return Response.redirect(`${url.origin}${path}/`, 302);
@@ -36,11 +68,11 @@ export async function onRequest({ request, params }) {
   if (response.status >= 300 && response.status < 400) {
     const location = response.headers.get("Location");
     if (location) {
-      const base = `${url.origin}/${project}/api`;
+      const base = `${url.origin}${apiPrefix}`;
       const newLocation = location.startsWith("/")
         ? `${base}${location}`
         : location.startsWith("http")
-          ? location.replace(new URL(upstream).origin, `${url.origin}/${project}/api`)
+          ? location.replace(new URL(upstream).origin, `${url.origin}${apiPrefix}`)
           : `${base}/${location}`;
 
       const currentPathNorm = path.replace(/\/?$/, "/");
@@ -64,26 +96,6 @@ export async function onRequest({ request, params }) {
       headers.set("Location", newLocation);
       return new Response(response.body, { status: response.status, headers });
     }
-  }
-
-  const contentType = response.headers.get("content-type") || "";
-  if (response.status === 200 && contentType.includes("text/html")) {
-    const pathAfterApi = path.slice(`/${project}/api/`.length);
-    const version = pathAfterApi.split("/")[0];
-    const versionRoot = version ? `/${project}/api/${version}/` : `/${project}/api/`;
-
-    const html = await response.text();
-
-    const baseUrl = `${url.origin}${versionRoot}`;
-    const baseTag = `<base href="${baseUrl}">`;
-    let rewritten = html.replace(/<head(\s[^>]*)?>/i, (m) => m + baseTag);
-
-    const assetPattern = /(href|src)=["']dev\/(stylesheet\.css|script\.js|jquery-ui\.overrides\.css|script-dir\/[^"']+)["']/gi;
-    rewritten = rewritten.replace(assetPattern, (_, attr, rest) => `${attr}="${versionRoot}${rest}"`);
-
-    const newHeaders = new Headers(response.headers);
-    newHeaders.set("content-length", String(new TextEncoder().encode(rewritten).length));
-    return new Response(rewritten, { status: 200, headers: newHeaders });
   }
 
   return response;
