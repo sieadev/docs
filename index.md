@@ -24,6 +24,9 @@ features:
   - title: MoBot
     details: A modular Discord bot written in Java, with a feature-rich API.
     link: /mobot
+  - title: Unifi4J
+    details: Java client for the Unifi Network API with a reactive-style API.
+    link: /unifi4j
 ---
 
 <br>

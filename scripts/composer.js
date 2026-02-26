@@ -8,7 +8,7 @@ const __dirname = path.dirname(__filename);
 
 console.log('Starting composer.js execution');
 
-const projects = ['jonion', 'mobot'];
+const projects = ['jonion', 'mobot', 'unifi4j'];
 const sidebarConfig = {};
 const pageMetadata = {};
 
