@@ -27,7 +27,12 @@ export default {
     ignoreDeadLinks: true,
 
     head: [
-        ['link', { rel: 'icon', href: 'https://static.pixel-services.com/static/assets/pservices_logo.png' }]
+        ['link', { rel: 'icon', href: 'https://static.pixel-services.com/static/assets/pservices_logo.png' }],
+        ['script', {
+            src: 'https://context7.com/widget.js',
+            'data-library': '/websites/siea_dev_jonion',
+            async: true,
+        }],
     ],
 
     themeConfig: {
